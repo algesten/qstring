@@ -1,9 +1,15 @@
 [package]
 name = "qstring"
 description = "Query string parser"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Martin Algesten <martin@algesten.se>"]
 license = "MIT"
+repository = "https://github.com/algesten/qstring"
+readme = "README.md"
+keywords      = [ "query", "url", "query string", "querystring" ]
+exclude       = [
+  ".gitignore",
+]
 
 [dependencies]
 urlencoding = "1.0.0"
