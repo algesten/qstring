@@ -1,7 +1,9 @@
 [package]
 name = "qstring"
+description = "Query string parser"
 version = "0.1.0"
 authors = ["Martin Algesten <martin@algesten.se>"]
+license = "MIT"
 
 [dependencies]
 urlencoding = "1.0.0"
