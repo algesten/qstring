@@ -1,0 +1,7 @@
+[package]
+name = "qstring"
+version = "0.1.0"
+authors = ["Martin Algesten <martin@algesten.se>"]
+
+[dependencies]
+urlencoding = "1.0.0"
