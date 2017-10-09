@@ -108,6 +108,19 @@ impl QString {
         }
     }
 
+    /// Get a query parameter by name.
+    ///
+    /// ```
+    /// let qs = qstring::QString::from("?foo=bar");
+    /// let foo = qs.get("foo");
+    /// assert_eq!(foo, Some("bar".to_string()));
+    /// ```
+    pub fn get(&self, name: &str) -> Option<String> {
+        self.params.iter()
+            .find(|p| &p.name == name)
+            .map(|p| p.value.clone())
+    }
+
 }
 
 impl<'a> From<&'a str> for QString {
