@@ -4,7 +4,7 @@ extern crate urlencoding;
 use urlencoding::{encode, decode};
 use std::iter::Iterator;
 
-/// A query string. Holds a list of `Param`s.
+/// A query string. Holds a list of `(key,value)`.
 ///
 /// Examples
 ///
@@ -28,85 +28,46 @@ use std::iter::Iterator;
 ///
 /// ```
 /// let qs = qstring::QString::new(vec![
-///    qstring::Param::new("foo", "bar baz"),
-///    qstring::Param::new("panda", "true"),
+///    ("foo", "bar baz"),
+///    ("panda", "true"),
 /// ]);
-/// assert_eq!(format!("{}", qs), "?&foo=bar%20baz&panda=true");
+/// assert_eq!(format!("{}", qs), "?foo=bar%20baz&panda=true");
 /// ```
 ///
-/// Can be looped over as `Param`.
-///
-/// ```
-/// let qs = qstring::QString::from("?foo=bar");
-/// for param in qs {
-///    assert_eq!(param.name, "foo");
-///    assert_eq!(param.value, "bar");
-///    assert_eq!(param, ("foo", "bar"));
-/// }
-/// ```
 #[derive(Clone, Debug, PartialEq)]
 pub struct QString {
-    /// List of parameters in the query string.
     keys: Vec<String>,
     vals: Vec<Option<String>>,
     empty: Option<String>,
 }
 
-/// Parameter found in a query string.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Param {
-    /// Query parameter name.
-    pub name: String,
-    /// Query parameter value.
-    pub value: String,
-}
-
-/// Single parameter in a query string.
-impl Param {
-
-    /// Constructs a `Param` from raw `&str` values.
-    ///
-    /// ```
-    /// let p = qstring::Param::new("foo", "bar baz");
-    /// assert_eq!(format!("{}", p), "&foo=bar%20baz")
-    /// ```
-    pub fn new(name: &str, value: &str) -> Param {
-        Param {
-            name: name.to_string(),
-            value: value.to_string(),
-        }
-    }
-
-    /// Constructs a `Param` by URL decoding the given values.
-    ///
-    /// ```
-    /// let p = qstring::Param::new_esc("foo", "bar%20baz");
-    /// assert_eq!(format!("{}", p), "&foo=bar%20baz")
-    /// ```
-    pub fn new_esc(name: &str, value: &str) -> Param {
-        Param {
-            name: decode(name).unwrap_or_else(|_| name.to_string()),
-            value: decode(value).unwrap_or_else(|_| value.to_string()),
-        }
-    }
-
+fn new_esc(name: &str, value: &str) -> (String, String) {
+    (decode(name).unwrap_or_else(|_| name.to_string()),
+    decode(value).unwrap_or_else(|_| value.to_string()))
 }
 
 impl QString {
 
-    /// Constructs a `QString` from a list of `Param`s.
+    /// Constructs a `QString` from a list of pairs.
     ///
     /// ```
     /// let qs = qstring::QString::new(vec![
-    ///    qstring::Param::new("foo", "bar baz"),
-    ///    qstring::Param::new("panda", "true"),
+    ///    ("foo", "bar baz"),
+    ///    ("panda", "true"),
     /// ]);
-    /// assert_eq!(format!("{}", qs), "?&foo=bar%20baz&panda=true");
+    /// assert_eq!(format!("{}", qs), "?foo=bar%20baz&panda=true");
     /// ```
-    pub fn new(params: Vec<Param> ) -> QString {
+    pub fn new<S>(params: Vec<(S, S)> ) -> QString
+        where S: Into<String> {
+        let mut keys = vec![];
+        let mut vals = vec![];
+        for (k, v) in params {
+            keys.push(k.into());
+            vals.push(Some(v.into()));
+        }
         QString {
-            keys: params.iter().map(|p| p.name.clone()).collect(),
-            vals: params.into_iter().map(|p| Some(p.value)).collect(),
+            keys,
+            vals,
             empty: None,
         }
     }
@@ -123,18 +84,39 @@ impl QString {
         self.vals[idx].clone()
     }
 
+    /// Converts the QString to list of pairs.
+    ///
+    /// ```
+    /// let qs = qstring::QString::from("?foo=bar&baz=boo");
+    /// let ps = qs.to_pairs();
+    /// assert_eq!(ps, vec![
+    ///     ("foo".to_string(), "bar".to_string()),
+    ///     ("baz".to_string(), "boo".to_string()),
+    /// ]);
+    pub fn to_pairs(self) -> Vec<(String, String)> {
+        let v: Vec<String> = self.vals
+            .into_iter()
+            .map(|v| v.unwrap())
+            .collect();
+        let ret: Vec<(String,String)> =  self.keys
+            .into_iter()
+            .zip(v.into_iter())
+            .collect();
+        ret
+    }
+
 }
 
 impl<'a> From<&'a str> for QString {
 
-    /// Constructs a new `QString` and find the `Param`s therein.
+    /// Constructs a new `QString` by parsing a query string part of the URL.
     ///
     /// Examples
     ///
     /// ```
     /// let qs = qstring::QString::from("?foo=bar");
-    /// let v: Vec<qstring::Param> = qs.into();
-    /// assert_eq!(v, vec![("foo", "bar")]);
+    /// let v: Vec<(String, String)> = qs.to_pairs();
+    /// assert_eq!(v, vec![("foo".to_string(), "bar".to_string())]);
     /// ```
     fn from(origin: &str) -> Self {
 
@@ -164,7 +146,7 @@ impl<'a> From<&'a str> for QString {
                     // name is until next &, which means no value and shortcut
                     // to start straight after the &.
                     Some(pos) => {
-                        params.push(Param::new_esc(&cur[..pos], ""));
+                        params.push(new_esc(&cur[..pos], ""));
                         cur = &cur[(pos + 1)..];
                         continue;
                     },
@@ -185,46 +167,13 @@ impl<'a> From<&'a str> for QString {
                 Some(pos) => (&rest[..pos], &rest[(pos + 1)..]),
             };
             // found a parameter
-            params.push(Param::new_esc(name, value));
+            params.push(new_esc(name, value));
             cur = newcur;
         }
 
         QString::new(params)
     }
 
-}
-
-impl Into<Vec<Param>> for QString {
-    fn into(self) -> Vec<Param> {
-        self.keys.iter().enumerate()
-        .map(|(idx, k)| Param {
-            name:k.clone(),
-            value:self.vals[idx].clone().unwrap()
-        })
-        .collect()
-    }
-}
-
-impl IntoIterator for QString {
-    type Item = Param;
-    type IntoIter = ::std::vec::IntoIter<Param>;
-    fn into_iter(self) -> Self::IntoIter {
-        let v:Vec<Param> = self.into();
-        v.into_iter()
-    }
-}
-
-
-impl<'a> PartialEq<(&'a str, &'a str)> for Param {
-    fn eq(&self, other: &(&str, &str)) -> bool {
-        self.name == other.0 && self.value == other.1
-    }
-}
-
-impl ::std::fmt::Display for Param {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        write!(f, "&{}={}", encode(&self.name), encode(&self.value))
-    }
 }
 
 impl<'b> ::std::ops::Index<&'static str> for QString {
@@ -241,12 +190,20 @@ impl<'b> ::std::ops::Index<&'static str> for QString {
     }
 }
 
+impl IntoIterator for QString {
+    type Item = (String, String);
+    type IntoIter = ::std::vec::IntoIter<(String,String)>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.to_pairs().into_iter()
+    }
+}
+
 impl ::std::fmt::Display for QString {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "?")?;
-        let v: Vec<Param> = self.clone().into();
-        for param in v {
-            write!(f, "{}", param)?;
+        for (idx, k) in self.keys.iter().enumerate() {
+            let v = self.vals[idx].as_ref().unwrap();
+            write!(f, "{}{}={}", (if idx == 0 {""} else {"&"}), encode(k), encode(v))?;
         }
         Ok(())
     }
@@ -262,8 +219,11 @@ mod tests {
             #[test]
             fn $func_name() {
                 let qs = QString::from($origin);
-                let ps: Vec<Param> = qs.into();
-                assert_eq!(ps, $result as Vec<(&str, &str)>);
+                let ps: Vec<(String, String)> = qs.to_pairs();
+                let cs: Vec<(String, String)> = ($result as Vec<(&str, &str)>)
+                    .into_iter().map(|(k,v)| (k.to_string(), v.to_string()))
+                    .collect();
+                assert_eq!(ps, cs);
             }
         )
     }
