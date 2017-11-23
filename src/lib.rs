@@ -2,6 +2,7 @@
 extern crate urlencoding;
 
 use urlencoding::{encode, decode};
+use std::iter::Iterator;
 
 /// A query string. Holds a list of `Param`s.
 ///
@@ -11,16 +12,16 @@ use urlencoding::{encode, decode};
 ///
 /// ```
 /// let qs = qstring::QString::from("?foo=bar%20baz");
-/// let foo = &qs["foo"];
+/// let foo = qs["foo"].clone().unwrap();
 /// assert_eq!(foo, "bar baz");
 /// ```
 ///
-/// Parameters not found are "".
+/// Parameters not found are None.
 ///
 /// ```
 /// let qs = qstring::QString::from("?foo=bar");
 /// let foo = &qs["panda"];
-/// assert_eq!(foo, "");
+/// assert!(foo.is_none());
 /// ```
 ///
 /// The query string can be assembled.
@@ -46,8 +47,9 @@ use urlencoding::{encode, decode};
 #[derive(Clone, Debug, PartialEq)]
 pub struct QString {
     /// List of parameters in the query string.
-    pub params: Vec<Param>,
-    empty: String,
+    keys: Vec<String>,
+    vals: Vec<Option<String>>,
+    empty: Option<String>,
 }
 
 /// Parameter found in a query string.
@@ -103,8 +105,9 @@ impl QString {
     /// ```
     pub fn new(params: Vec<Param> ) -> QString {
         QString {
-            params: params,
-            empty: "".to_string(),
+            keys: params.iter().map(|p| p.name.clone()).collect(),
+            vals: params.into_iter().map(|p| Some(p.value)).collect(),
+            empty: None,
         }
     }
 
@@ -116,9 +119,8 @@ impl QString {
     /// assert_eq!(foo, Some("bar".to_string()));
     /// ```
     pub fn get(&self, name: &str) -> Option<String> {
-        self.params.iter()
-            .find(|p| &p.name == name)
-            .map(|p| p.value.clone())
+        let idx = self.keys.iter().position(|k| k == name)?;
+        self.vals[idx].clone()
     }
 
 }
@@ -131,7 +133,8 @@ impl<'a> From<&'a str> for QString {
     ///
     /// ```
     /// let qs = qstring::QString::from("?foo=bar");
-    /// assert_eq!(qs.params, vec![("foo", "bar")]);
+    /// let v: Vec<qstring::Param> = qs.into();
+    /// assert_eq!(v, vec![("foo", "bar")]);
     /// ```
     fn from(origin: &str) -> Self {
 
@@ -191,13 +194,26 @@ impl<'a> From<&'a str> for QString {
 
 }
 
+impl Into<Vec<Param>> for QString {
+    fn into(self) -> Vec<Param> {
+        self.keys.iter().enumerate()
+        .map(|(idx, k)| Param {
+            name:k.clone(),
+            value:self.vals[idx].clone().unwrap()
+        })
+        .collect()
+    }
+}
+
 impl IntoIterator for QString {
     type Item = Param;
     type IntoIter = ::std::vec::IntoIter<Param>;
     fn into_iter(self) -> Self::IntoIter {
-        self.params.into_iter()
+        let v:Vec<Param> = self.into();
+        v.into_iter()
     }
 }
+
 
 impl<'a> PartialEq<(&'a str, &'a str)> for Param {
     fn eq(&self, other: &(&str, &str)) -> bool {
@@ -211,21 +227,25 @@ impl ::std::fmt::Display for Param {
     }
 }
 
-impl<'b> ::std::ops::Index<&'b str> for QString {
-    type Output = String;
-    fn index(&self, index: &'b str) -> &Self::Output {
-        self.params.iter()
+impl<'b> ::std::ops::Index<&'static str> for QString {
+    type Output = Option<String>;
+    fn index<'a>(&'a self, index: &'b str) -> &'a Self::Output {
+        let idx = self.keys.iter()
             .rev()
-            .find(|p| p.name == index)
-            .map(|p| &p.value)
-            .unwrap_or(&self.empty)
+            .position(|k| k == index);
+        let ret = match idx {
+            None => &self.empty,
+            Some(idx) => self.vals.index(idx),
+        };
+        ret
     }
 }
 
 impl ::std::fmt::Display for QString {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "?")?;
-        for param in &self.params {
+        let v: Vec<Param> = self.clone().into();
+        for param in v {
             write!(f, "{}", param)?;
         }
         Ok(())
@@ -242,7 +262,8 @@ mod tests {
             #[test]
             fn $func_name() {
                 let qs = QString::from($origin);
-                assert_eq!(qs.params, $result as Vec<(&str, &str)>);
+                let ps: Vec<Param> = qs.into();
+                assert_eq!(ps, $result as Vec<(&str, &str)>);
             }
         )
     }
