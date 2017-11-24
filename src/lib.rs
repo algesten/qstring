@@ -16,7 +16,7 @@ use std::iter::Iterator;
 /// assert_eq!(foo, "bar baz");
 /// ```
 ///
-/// Parameters not found are None.
+/// Parameters not found are `None`.
 ///
 /// ```
 /// let qs = qstring::QString::from("?foo=bar");
@@ -24,7 +24,7 @@ use std::iter::Iterator;
 /// assert!(foo.is_none());
 /// ```
 ///
-/// The query string can be assembled.
+/// The query string can be assembled from pairs.
 ///
 /// ```
 /// let qs = qstring::QString::new(vec![
@@ -93,6 +93,7 @@ impl QString {
     ///     ("foo".to_string(), "bar".to_string()),
     ///     ("baz".to_string(), "boo".to_string()),
     /// ]);
+    /// ```
     pub fn to_pairs(self) -> Vec<(String, String)> {
         let v: Vec<String> = self.vals
             .into_iter()
@@ -110,6 +111,7 @@ impl QString {
 impl<'a> From<&'a str> for QString {
 
     /// Constructs a new `QString` by parsing a query string part of the URL.
+    /// Can start with ? or not, either works.
     ///
     /// Examples
     ///
