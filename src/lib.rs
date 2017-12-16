@@ -1,4 +1,3 @@
-
 extern crate percent_encoding;
 
 use percent_encoding::{percent_decode, utf8_percent_encode, QUERY_ENCODE_SET};
@@ -8,11 +7,11 @@ use std::iter::Iterator;
 ///
 /// Examples
 ///
-/// Parameters are indexed by their names.
+/// Parameters can be get by their names.
 ///
 /// ```
 /// let qs = qstring::QString::from("?foo=bar%20baz");
-/// let foo = qs["foo"].clone().unwrap();
+/// let foo = qs.get("foo").unwrap();
 /// assert_eq!(foo, "bar baz");
 /// ```
 ///
@@ -20,7 +19,7 @@ use std::iter::Iterator;
 ///
 /// ```
 /// let qs = qstring::QString::from("?foo=bar");
-/// let foo = &qs["panda"];
+/// let foo = &qs.get("panda");
 /// assert!(foo.is_none());
 /// ```
 ///
@@ -34,15 +33,12 @@ use std::iter::Iterator;
 /// assert_eq!(format!("{}", qs), "?foo=bar%20baz&panda=true");
 /// ```
 ///
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct QString {
-    keys: Vec<String>,
-    vals: Vec<Option<String>>,
-    empty: Option<String>,
+    pairs: Vec<(String, String)>,
 }
 
 impl QString {
-
     /// Constructs a `QString` from a list of pairs.
     ///
     /// ```
@@ -52,18 +48,13 @@ impl QString {
     /// ]);
     /// assert_eq!(format!("{}", qs), "?foo=bar%20baz&panda=true");
     /// ```
-    pub fn new<S>(params: Vec<(S, S)> ) -> QString
-        where S: Into<String> {
-        let mut keys = vec![];
-        let mut vals = vec![];
-        for (k, v) in params {
-            keys.push(k.into());
-            vals.push(Some(v.into()));
-        }
+    pub fn new<S, T>(params: Vec<(S, T)>) -> QString
+    where
+        S: Into<String>,
+        T: Into<String>,
+    {
         QString {
-            keys,
-            vals,
-            empty: None,
+            pairs: params.into_iter().map(|(k, v)| (k.into(), v.into())).collect()
         }
     }
 
@@ -75,8 +66,10 @@ impl QString {
     /// assert_eq!(foo, Some("bar".to_string()));
     /// ```
     pub fn get(&self, name: &str) -> Option<String> {
-        let idx = self.keys.iter().position(|k| k == name)?;
-        self.vals[idx].clone()
+        self.pairs
+            .iter()
+            .find(|&p| p.0 == name)
+            .map(|ref p| p.1.clone())
     }
 
     /// Converts the QString to list of pairs.
@@ -90,21 +83,11 @@ impl QString {
     /// ]);
     /// ```
     pub fn to_pairs(self) -> Vec<(String, String)> {
-        let v: Vec<String> = self.vals
-            .into_iter()
-            .map(|v| v.unwrap())
-            .collect();
-        let ret: Vec<(String,String)> =  self.keys
-            .into_iter()
-            .zip(v.into_iter())
-            .collect();
-        ret
+        self.pairs.clone()
     }
-
 }
 
 impl<'a> From<&'a str> for QString {
-
     /// Constructs a new `QString` by parsing a query string part of the URL.
     /// Can start with ? or not, either works.
     ///
@@ -116,7 +99,6 @@ impl<'a> From<&'a str> for QString {
     /// assert_eq!(v, vec![("foo".to_string(), "bar".to_string())]);
     /// ```
     fn from(origin: &str) -> Self {
-
         // current slice left to find params in
         let mut cur = origin;
 
@@ -146,7 +128,7 @@ impl<'a> From<&'a str> for QString {
                         params.push((decode(&cur[..pos]), "".to_string()));
                         cur = &cur[(pos + 1)..];
                         continue;
-                    },
+                    }
                 },
                 // found one, name is up until = and rest is after.
                 Some(pos) => (&cur[..pos], &cur[(pos + 1)..]),
@@ -170,42 +152,43 @@ impl<'a> From<&'a str> for QString {
 
         QString::new(params)
     }
-
-}
-
-impl<'b> ::std::ops::Index<&'static str> for QString {
-    type Output = Option<String>;
-    fn index<'a>(&'a self, index: &'b str) -> &'a Self::Output {
-        let idx = self.keys.iter()
-            .rev()
-            .position(|k| k == index);
-        let ret = match idx {
-            None => &self.empty,
-            Some(idx) => self.vals.index(idx),
-        };
-        ret
-    }
 }
 
 impl IntoIterator for QString {
     type Item = (String, String);
-    type IntoIter = ::std::vec::IntoIter<(String,String)>;
+    type IntoIter = ::std::vec::IntoIter<(String, String)>;
     fn into_iter(self) -> Self::IntoIter {
         self.to_pairs().into_iter()
+    }
+}
+
+impl Into<Vec<(String, String)>> for QString {
+    fn into(self) -> Vec<(String, String)> {
+        self.pairs
+    }
+}
+
+impl Into<String> for QString {
+    fn into(self) -> String {
+        format!("{}", self)
     }
 }
 
 impl ::std::fmt::Display for QString {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "?")?;
-        for (idx, k) in self.keys.iter().enumerate() {
-            let v = self.vals[idx].as_ref().unwrap();
-            write!(f, "{}{}={}", (if idx == 0 {""} else {"&"}), encode(k), encode(v))?;
+        for (idx, ref p) in self.pairs.iter().enumerate() {
+            write!(
+                f,
+                "{}{}={}",
+                (if idx == 0 { "" } else { "&" }),
+                encode(&p.0),
+                encode(&p.1)
+            )?;
         }
         Ok(())
     }
 }
-
 
 fn decode(s: &str) -> String {
     percent_decode(s.as_bytes())
