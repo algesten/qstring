@@ -1,7 +1,7 @@
 
-extern crate urlencoding;
+extern crate percent_encoding;
 
-use urlencoding::{encode, decode};
+use percent_encoding::{percent_decode, utf8_percent_encode, QUERY_ENCODE_SET};
 use std::iter::Iterator;
 
 /// A query string. Holds a list of `(key,value)`.
@@ -39,11 +39,6 @@ pub struct QString {
     keys: Vec<String>,
     vals: Vec<Option<String>>,
     empty: Option<String>,
-}
-
-fn new_esc(name: &str, value: &str) -> (String, String) {
-    (decode(name).unwrap_or_else(|_| name.to_string()),
-    decode(value).unwrap_or_else(|_| value.to_string()))
 }
 
 impl QString {
@@ -148,7 +143,7 @@ impl<'a> From<&'a str> for QString {
                     // name is until next &, which means no value and shortcut
                     // to start straight after the &.
                     Some(pos) => {
-                        params.push(new_esc(&cur[..pos], ""));
+                        params.push((decode(&cur[..pos]), "".to_string()));
                         cur = &cur[(pos + 1)..];
                         continue;
                     },
@@ -169,7 +164,7 @@ impl<'a> From<&'a str> for QString {
                 Some(pos) => (&rest[..pos], &rest[(pos + 1)..]),
             };
             // found a parameter
-            params.push(new_esc(name, value));
+            params.push((decode(name), decode(value)));
             cur = newcur;
         }
 
@@ -209,6 +204,19 @@ impl ::std::fmt::Display for QString {
         }
         Ok(())
     }
+}
+
+
+fn decode(s: &str) -> String {
+    percent_decode(s.as_bytes())
+        .decode_utf8()
+        .map(|cow| cow.into_owned())
+        .unwrap_or_else(|_| s.to_string())
+}
+
+
+fn encode(s: &str) -> String {
+    utf8_percent_encode(s, QUERY_ENCODE_SET).to_string()
 }
 
 

@@ -12,4 +12,4 @@ exclude       = [
 ]
 
 [dependencies]
-urlencoding = "1.0.0"
+percent-encoding = "1.0"
