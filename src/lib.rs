@@ -35,7 +35,19 @@ use std::iter::Iterator;
 ///
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct QString {
-    pairs: Vec<(String, String)>,
+    pairs: Vec<(String, QValue)>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum QValue {
+    Empty,
+    Value(String),
+}
+
+impl From<String> for QValue {
+    fn from(s: String) -> QValue {
+        QValue::Value(s)
+    }
 }
 
 impl QString {
@@ -54,11 +66,28 @@ impl QString {
         T: Into<String>,
     {
         QString {
-            pairs: params.into_iter().map(|(k, v)| (k.into(), v.into())).collect()
+            pairs: params
+                .into_iter()
+                .map(|(k, v)| (k.into(), QValue::Value(v.into())))
+                .collect(),
         }
     }
 
+    /// Tells if a query parameter is present.
+    ///
+    /// ```
+    /// let qs = qstring::QString::from("?foo");
+    /// assert!(qs.has("foo"));
+    /// assert!(qs.get("foo").is_some());
+    /// ```
+    pub fn has(&self, name: &str) -> bool {
+        println!("{:?}", self.pairs);
+        self.pairs.iter().find(|&p| p.0 == name).is_some()
+    }
+
     /// Get a query parameter by name.
+    ///
+    /// Empty query parameters return `""`
     ///
     /// ```
     /// let qs = qstring::QString::from("?foo=bar");
@@ -69,7 +98,10 @@ impl QString {
         self.pairs
             .iter()
             .find(|&p| p.0 == name)
-            .map(|ref p| p.1.clone())
+            .and_then(|ref p| match &p.1 {
+                &QValue::Empty => Some("".to_string()),
+                &QValue::Value(ref s) => Some(s.clone()),
+            })
     }
 
     /// Converts the QString to list of pairs.
@@ -83,7 +115,41 @@ impl QString {
     /// ]);
     /// ```
     pub fn to_pairs(self) -> Vec<(String, String)> {
-        self.pairs.clone()
+        self.pairs.iter().map(|p| (p.0.clone(), match &p.1 {
+            &QValue::Empty => "".to_string(),
+            &QValue::Value(ref s) => s.clone(),
+        })).collect()
+    }
+
+    /// Adds another query parameter pair.
+    ///
+    /// ```
+    /// let mut qs = qstring::QString::from("?foo=bar&baz=boo");
+    ///
+    /// qs.add_pair(("panda", "bear"));
+    ///
+    /// assert_eq!(qs.to_string(), "?foo=bar&baz=boo&panda=bear");
+    /// ```
+    pub fn add_pair<S, T>(&mut self, pair: (S, T))
+    where
+        S: Into<String>,
+        T: Into<String>,
+    {
+        self.pairs.push((pair.0.into(), QValue::Value(pair.1.into())));
+    }
+
+    /// Parse the string and add all found parameters to this instance.
+    ///
+    /// ```
+    /// let mut qs = qstring::QString::from("?foo");
+    ///
+    /// qs.add_str("&bar=baz&pooch&panda=bear");
+    ///
+    /// assert_eq!(qs.to_string(), "?foo&bar=baz&pooch&panda=bear");
+    /// ```
+    pub fn add_str(&mut self, origin: &str) {
+        let mut to_add = str_to_pairs(origin);
+        self.pairs.append(&mut to_add);
     }
 }
 
@@ -99,59 +165,67 @@ impl<'a> From<&'a str> for QString {
     /// assert_eq!(v, vec![("foo".to_string(), "bar".to_string())]);
     /// ```
     fn from(origin: &str) -> Self {
-        // current slice left to find params in
-        let mut cur = origin;
-
-        // move forward if start with ?
-        if cur.len() > 0 && &cur[0..1] == "?" {
-            cur = &cur[1..];
+        QString {
+            pairs: str_to_pairs(origin)
         }
-
-        // where we build found parameters into
-        let mut params = vec![];
-
-        while cur.len() > 0 {
-            // if we're positioned on a &, skip it
-            if &cur[0..1] == "&" {
-                cur = &cur[1..];
-                continue;
-            }
-            // find position of next =
-            let (name, rest) = match cur.find("=") {
-                // no next =, name will be until next & or until end
-                None => match cur.find("&") {
-                    // no &, name is until end
-                    None => (cur, ""),
-                    // name is until next &, which means no value and shortcut
-                    // to start straight after the &.
-                    Some(pos) => {
-                        params.push((decode(&cur[..pos]), "".to_string()));
-                        cur = &cur[(pos + 1)..];
-                        continue;
-                    }
-                },
-                // found one, name is up until = and rest is after.
-                Some(pos) => (&cur[..pos], &cur[(pos + 1)..]),
-            };
-            // skip parameters with no name
-            if name.len() == 0 {
-                cur = rest;
-                continue;
-            }
-            // from rest, find next occurence of &
-            let (value, newcur) = match rest.find("&") {
-                // no next &, then value is all up until end
-                None => (rest, ""),
-                // found one, value is up until & and next round starts after.
-                Some(pos) => (&rest[..pos], &rest[(pos + 1)..]),
-            };
-            // found a parameter
-            params.push((decode(name), decode(value)));
-            cur = newcur;
-        }
-
-        QString::new(params)
     }
+}
+
+fn str_to_pairs(origin: &str) -> Vec<(String, QValue)> {
+    // current slice left to find params in
+    let mut cur = origin;
+
+    // move forward if start with ?
+    if cur.len() > 0 && &cur[0..1] == "?" {
+        cur = &cur[1..];
+    }
+
+    // where we build found parameters into
+    let mut params = vec![];
+
+    while cur.len() > 0 {
+        // if we're positioned on a &, skip it
+        if &cur[0..1] == "&" {
+            cur = &cur[1..];
+            continue;
+        }
+        // find position of next =
+        let (name, rest) = match cur.find("=") {
+            // no next =, name will be until next & or until end
+            None => match cur.find("&") {
+                // no &, name is until end
+                None => {
+                    params.push((decode(&cur[..]), QValue::Empty));
+                    break;
+                },
+                // name is until next &, which means no value and shortcut
+                // to start straight after the &.
+                Some(pos) => {
+                    params.push((decode(&cur[..pos]), QValue::Empty));
+                    cur = &cur[(pos + 1)..];
+                    continue;
+                }
+            },
+            // found one, name is up until = and rest is after.
+            Some(pos) => (&cur[..pos], &cur[(pos + 1)..]),
+        };
+        // skip parameters with no name
+        if name.len() == 0 {
+            cur = rest;
+            continue;
+        }
+        // from rest, find next occurence of &
+        let (value, newcur) = match rest.find("&") {
+            // no next &, then value is all up until end
+            None => (rest, ""),
+            // found one, value is up until & and next round starts after.
+            Some(pos) => (&rest[..pos], &rest[(pos + 1)..]),
+        };
+        // found a parameter
+        params.push((decode(name), QValue::Value(decode(value))));
+        cur = newcur;
+    }
+    params
 }
 
 impl IntoIterator for QString {
@@ -164,7 +238,7 @@ impl IntoIterator for QString {
 
 impl Into<Vec<(String, String)>> for QString {
     fn into(self) -> Vec<(String, String)> {
-        self.pairs
+        self.to_pairs()
     }
 }
 
@@ -180,10 +254,13 @@ impl ::std::fmt::Display for QString {
         for (idx, ref p) in self.pairs.iter().enumerate() {
             write!(
                 f,
-                "{}{}={}",
+                "{}{}{}",
                 (if idx == 0 { "" } else { "&" }),
                 encode(&p.0),
-                encode(&p.1)
+                match &p.1 {
+                    &QValue::Empty => "".to_string(),
+                    &QValue::Value(ref s) => format!("={}", encode(s)),
+                }
             )?;
         }
         Ok(())
