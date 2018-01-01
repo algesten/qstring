@@ -128,6 +128,31 @@ impl QString {
             .collect()
     }
 
+    /// Represent the QString as a list of pairs.
+    ///
+    /// ```
+    /// let qs = qstring::QString::from("?foo=bar&baz=boo");
+    /// let ps = qs.to_pairs();
+    /// assert_eq!(ps, vec![
+    ///     ("foo", "bar"),
+    ///     ("baz", "boo"),
+    /// ]);
+    /// ```
+    pub fn to_pairs(&self) -> Vec<(&str, &str)> {
+        self.pairs
+            .iter()
+            .map(|p| {
+                (
+                    p.0.as_str(),
+                    match p.1 {
+                        QValue::Empty => "",
+                        QValue::Value(ref s) => s.as_str(),
+                    },
+                )
+            })
+            .collect()
+    }
+
     /// Adds another query parameter pair.
     ///
     /// ```
