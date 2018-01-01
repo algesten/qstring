@@ -81,13 +81,12 @@ impl QString {
     /// assert!(qs.get("foo").is_some());
     /// ```
     pub fn has(&self, name: &str) -> bool {
-        println!("{:?}", self.pairs);
         self.pairs.iter().find(|&p| p.0 == name).is_some()
     }
 
     /// Get a query parameter by name.
     ///
-    /// Empty query parameters return `""`
+    /// Empty query parameters (`?foo`) return `""`
     ///
     /// ```
     /// let qs = qstring::QString::from("?foo=bar");
@@ -135,7 +134,8 @@ impl QString {
         S: Into<String>,
         T: Into<String>,
     {
-        self.pairs.push((pair.0.into(), QValue::Value(pair.1.into())));
+        self.pairs
+            .push((pair.0.into(), QValue::Value(pair.1.into())));
     }
 
     /// Parse the string and add all found parameters to this instance.
@@ -166,7 +166,7 @@ impl<'a> From<&'a str> for QString {
     /// ```
     fn from(origin: &str) -> Self {
         QString {
-            pairs: str_to_pairs(origin)
+            pairs: str_to_pairs(origin),
         }
     }
 }
@@ -197,7 +197,7 @@ fn str_to_pairs(origin: &str) -> Vec<(String, QValue)> {
                 None => {
                     params.push((decode(&cur[..]), QValue::Empty));
                     break;
-                },
+                }
                 // name is until next &, which means no value and shortcut
                 // to start straight after the &.
                 Some(pos) => {
