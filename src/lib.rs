@@ -81,7 +81,7 @@ impl QString {
     /// assert!(qs.get("foo").is_some());
     /// ```
     pub fn has(&self, name: &str) -> bool {
-        self.pairs.iter().find(|&p| p.0 == name).is_some()
+        self.pairs.iter().find(|p| p.0 == name).is_some()
     }
 
     /// Get a query parameter by name.
@@ -91,15 +91,15 @@ impl QString {
     /// ```
     /// let qs = qstring::QString::from("?foo=bar");
     /// let foo = qs.get("foo");
-    /// assert_eq!(foo, Some("bar".to_string()));
+    /// assert_eq!(foo, Some("bar"));
     /// ```
-    pub fn get(&self, name: &str) -> Option<String> {
+    pub fn get<'a>(&'a self, name: &str) -> Option<&'a str> {
         self.pairs
             .iter()
-            .find(|&p| p.0 == name)
-            .and_then(|ref p| match &p.1 {
-                &QValue::Empty => Some("".to_string()),
-                &QValue::Value(ref s) => Some(s.clone()),
+            .find(|p| p.0 == name)
+            .and_then(|p| match p.1 {
+                QValue::Empty => Some(""),
+                QValue::Value(ref s) => Some(s),
             })
     }
 
@@ -284,15 +284,15 @@ impl Into<String> for QString {
 impl ::std::fmt::Display for QString {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
         write!(f, "?")?;
-        for (idx, ref p) in self.pairs.iter().enumerate() {
+        for (idx, p) in self.pairs.iter().enumerate() {
             write!(
                 f,
                 "{}{}{}",
                 (if idx == 0 { "" } else { "&" }),
                 encode(&p.0),
-                match &p.1 {
-                    &QValue::Empty => "".to_string(),
-                    &QValue::Value(ref s) => format!("={}", encode(s)),
+                match p.1 {
+                    QValue::Empty => "".to_string(),
+                    QValue::Value(ref s) => format!("={}", encode(s)),
                 }
             )?;
         }
