@@ -107,17 +107,25 @@ impl QString {
     ///
     /// ```
     /// let qs = qstring::QString::from("?foo=bar&baz=boo");
-    /// let ps = qs.to_pairs();
+    /// let ps = qs.into_pairs();
     /// assert_eq!(ps, vec![
     ///     ("foo".to_string(), "bar".to_string()),
     ///     ("baz".to_string(), "boo".to_string()),
     /// ]);
     /// ```
-    pub fn to_pairs(self) -> Vec<(String, String)> {
-        self.pairs.iter().map(|p| (p.0.clone(), match &p.1 {
-            &QValue::Empty => "".to_string(),
-            &QValue::Value(ref s) => s.clone(),
-        })).collect()
+    pub fn into_pairs(self) -> Vec<(String, String)> {
+        self.pairs
+            .into_iter()
+            .map(|p| {
+                (
+                    p.0,
+                    match p.1 {
+                        QValue::Empty => "".to_string(),
+                        QValue::Value(s) => s,
+                    },
+                )
+            })
+            .collect()
     }
 
     /// Adds another query parameter pair.
@@ -161,7 +169,7 @@ impl<'a> From<&'a str> for QString {
     ///
     /// ```
     /// let qs = qstring::QString::from("?foo=bar");
-    /// let v: Vec<(String, String)> = qs.to_pairs();
+    /// let v: Vec<(String, String)> = qs.into_pairs();
     /// assert_eq!(v, vec![("foo".to_string(), "bar".to_string())]);
     /// ```
     fn from(origin: &str) -> Self {
@@ -232,13 +240,13 @@ impl IntoIterator for QString {
     type Item = (String, String);
     type IntoIter = ::std::vec::IntoIter<(String, String)>;
     fn into_iter(self) -> Self::IntoIter {
-        self.to_pairs().into_iter()
+        self.into_pairs().into_iter()
     }
 }
 
 impl Into<Vec<(String, String)>> for QString {
     fn into(self) -> Vec<(String, String)> {
-        self.to_pairs()
+        self.into_pairs()
     }
 }
 
@@ -289,7 +297,7 @@ mod tests {
             #[test]
             fn $func_name() {
                 let qs = QString::from($origin);
-                let ps: Vec<(String, String)> = qs.to_pairs();
+                let ps: Vec<(String, String)> = qs.into_pairs();
                 let cs: Vec<(String, String)> = ($result as Vec<(&str, &str)>)
                     .into_iter().map(|(k,v)| (k.to_string(), v.to_string()))
                     .collect();
