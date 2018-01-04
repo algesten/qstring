@@ -9,10 +9,9 @@ Query string parser.
 extern crate qstring;
 use qstring::QString;
 
-
 let qs = QString::from("?foo=bar");
-let foo = &qs["foo"];
-println!("{}", foo);
+let val = qs.get("foo").unwrap();
+println!("{}", val);
 ```
 
 ### License
