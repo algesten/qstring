@@ -1,7 +1,7 @@
 qstring
 =======
 
-Query string parser.
+Query string parser. Head over to [the docs](https://docs.rs/qstring).
 
 ### Example
 
@@ -14,7 +14,7 @@ let val = qs.get("foo").unwrap();
 println!("{}", val);
 ```
 
-### License
+### MIT License
 
 Copyright 2017 Martin Algesten
 
