@@ -184,6 +184,16 @@ impl QString {
         let mut to_add = str_to_pairs(origin);
         self.pairs.append(&mut to_add);
     }
+
+    /// The number of query string pairs.
+    pub fn len(&self) -> usize {
+        self.pairs.len()
+    }
+
+    /// if this query string is empty.
+    pub fn is_empty(&self) -> bool {
+        self.pairs.is_empty()
+    }
 }
 
 impl<'a> From<&'a str> for QString {
