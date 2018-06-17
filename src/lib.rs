@@ -30,7 +30,7 @@ use std::iter::Iterator;
 ///    ("foo", "bar baz"),
 ///    ("panda", "true"),
 /// ]);
-/// assert_eq!(format!("{}", qs), "?foo=bar%20baz&panda=true");
+/// assert_eq!(format!("{}", qs), "foo=bar%20baz&panda=true");
 /// ```
 ///
 #[derive(Clone, Debug, PartialEq, Default)]
@@ -58,7 +58,7 @@ impl QString {
     ///    ("foo", "bar baz"),
     ///    ("panda", "true"),
     /// ]);
-    /// assert_eq!(format!("{}", qs), "?foo=bar%20baz&panda=true");
+    /// assert_eq!(format!("{}", qs), "foo=bar%20baz&panda=true");
     /// ```
     pub fn new<S, T>(params: Vec<(S, T)>) -> QString
     where
@@ -160,7 +160,7 @@ impl QString {
     ///
     /// qs.add_pair(("panda", "bear"));
     ///
-    /// assert_eq!(qs.to_string(), "?foo=bar&baz=boo&panda=bear");
+    /// assert_eq!(qs.to_string(), "foo=bar&baz=boo&panda=bear");
     /// ```
     pub fn add_pair<S, T>(&mut self, pair: (S, T))
     where
@@ -178,7 +178,7 @@ impl QString {
     ///
     /// qs.add_str("&bar=baz&pooch&panda=bear");
     ///
-    /// assert_eq!(qs.to_string(), "?foo&bar=baz&pooch&panda=bear");
+    /// assert_eq!(qs.to_string(), "foo&bar=baz&pooch&panda=bear");
     /// ```
     pub fn add_str(&mut self, origin: &str) {
         let mut to_add = str_to_pairs(origin);
@@ -293,7 +293,6 @@ impl Into<String> for QString {
 
 impl ::std::fmt::Display for QString {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        write!(f, "?")?;
         for (idx, p) in self.pairs.iter().enumerate() {
             write!(
                 f,
