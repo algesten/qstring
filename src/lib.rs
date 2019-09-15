@@ -1,6 +1,6 @@
-extern crate percent_encoding;
+#![warn(clippy::all)]
 
-use percent_encoding::{percent_decode, utf8_percent_encode, QUERY_ENCODE_SET};
+use percent_encoding::{percent_decode, utf8_percent_encode, AsciiSet, CONTROLS};
 use std::iter::Iterator;
 
 /// A query string. Holds a list of `(key,value)`.
@@ -81,7 +81,7 @@ impl QString {
     /// assert!(qs.get("foo").is_some());
     /// ```
     pub fn has(&self, name: &str) -> bool {
-        self.pairs.iter().find(|p| p.0 == name).is_some()
+        self.pairs.iter().any(|p| p.0 == name)
     }
 
     /// Get a query parameter by name.
@@ -219,23 +219,23 @@ fn str_to_pairs(origin: &str) -> Vec<(String, QValue)> {
     let mut cur = origin;
 
     // move forward if start with ?
-    if cur.len() > 0 && &cur[0..1] == "?" {
+    if !cur.is_empty() && &cur[0..1] == "?" {
         cur = &cur[1..];
     }
 
     // where we build found parameters into
     let mut params = vec![];
 
-    while cur.len() > 0 {
+    while !cur.is_empty() {
         // if we're positioned on a &, skip it
         if &cur[0..1] == "&" {
             cur = &cur[1..];
             continue;
         }
         // find position of next =
-        let (name, rest) = match cur.find("=") {
+        let (name, rest) = match cur.find('=') {
             // no next =, name will be until next & or until end
-            None => match cur.find("&") {
+            None => match cur.find('&') {
                 // no &, name is until end
                 None => {
                     params.push((decode(&cur[..]), QValue::Empty));
@@ -253,12 +253,12 @@ fn str_to_pairs(origin: &str) -> Vec<(String, QValue)> {
             Some(pos) => (&cur[..pos], &cur[(pos + 1)..]),
         };
         // skip parameters with no name
-        if name.len() == 0 {
+        if name.is_empty() {
             cur = rest;
             continue;
         }
         // from rest, find next occurence of &
-        let (value, newcur) = match rest.find("&") {
+        let (value, newcur) = match rest.find('&') {
             // no next &, then value is all up until end
             None => (rest, ""),
             // found one, value is up until & and next round starts after.
@@ -316,9 +316,10 @@ fn decode(s: &str) -> String {
         .unwrap_or_else(|_| s.to_string())
 }
 
+const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
 
 fn encode(s: &str) -> String {
-    utf8_percent_encode(s, QUERY_ENCODE_SET).to_string()
+    utf8_percent_encode(s, FRAGMENT).to_string()
 }
 
 
