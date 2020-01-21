@@ -330,7 +330,9 @@ const FRAGMENT: &AsciiSet = &CONTROLS
     .add(b'<')
     .add(b'>')
     .add(b'`')
-    .add(b'&');
+    .add(b'&')
+    .add(b'?')
+    .add(b'=');
 
 fn encode(s: &str) -> String {
     utf8_percent_encode(s, FRAGMENT).to_string()
@@ -357,8 +359,8 @@ mod tests {
 
     #[test]
     fn encode_amp() {
-        let x = QString::new(vec![("foo", "b&ar")]);
-        assert_eq!("foo=b%26ar", x.to_string());
+        let x = QString::new(vec![("foo", "b&?=ar")]);
+        assert_eq!("foo=b%26%3F%3Dar", x.to_string());
     }
 
     #[test]
