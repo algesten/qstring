@@ -249,8 +249,16 @@ fn str_to_pairs(origin: &str) -> Vec<(String, QValue)> {
                     continue;
                 }
             },
-            // found one, name is up until = and rest is after.
-            Some(pos) => (&cur[..pos], &cur[(pos + 1)..]),
+            Some(pos) => {
+                if let Some(apos) = cur.find('&') {
+                    if apos < pos {
+                        params.push((decode(&cur[..apos]), QValue::Empty));
+                        cur = &cur[(apos + 1)..];
+                        continue;
+                    }
+                }
+                (&cur[..pos], &cur[(pos + 1)..])
+            }
         };
         // skip parameters with no name
         if name.is_empty() {
@@ -316,29 +324,49 @@ fn decode(s: &str) -> String {
         .unwrap_or_else(|_| s.to_string())
 }
 
-const FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
+const FRAGMENT: &AsciiSet = &CONTROLS
+    .add(b' ')
+    .add(b'"')
+    .add(b'<')
+    .add(b'>')
+    .add(b'`')
+    .add(b'&');
 
 fn encode(s: &str) -> String {
     utf8_percent_encode(s, FRAGMENT).to_string()
 }
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     macro_rules! test {
-        ($func_name:ident, $origin:expr, $result:expr) => (
+        ($func_name:ident, $origin:expr, $result:expr) => {
             #[test]
             fn $func_name() {
                 let qs = QString::from($origin);
                 let ps: Vec<(String, String)> = qs.into_pairs();
                 let cs: Vec<(String, String)> = ($result as Vec<(&str, &str)>)
-                    .into_iter().map(|(k,v)| (k.to_string(), v.to_string()))
+                    .into_iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string()))
                     .collect();
                 assert_eq!(ps, cs);
             }
-        )
+        };
+    }
+
+    #[test]
+    fn encode_amp() {
+        let x = QString::new(vec![("foo", "b&ar")]);
+        assert_eq!("foo=b%26ar", x.to_string());
+    }
+
+    #[test]
+    fn amps_in_a_row() {
+        assert_eq!(
+            QString::from("&bar=baz&pooch&panda=bear").to_pairs(),
+            vec![("bar", "baz"), ("pooch", ""), ("panda", "bear")]
+        );
     }
 
     test!(empty_1, "", vec![]);
@@ -374,5 +402,4 @@ mod tests {
     test!(ac_is_5, "?a=b&c=", vec![("a", "b"), ("c", "")]);
     test!(ac_is_6, "?a=&c=d", vec![("a", ""), ("c", "d")]);
     test!(ac_is_7, "?a=b&c=d", vec![("a", "b"), ("c", "d")]);
-
 }
