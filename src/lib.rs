@@ -194,6 +194,15 @@ impl QString {
     pub fn is_empty(&self) -> bool {
         self.pairs.is_empty()
     }
+
+    /// remove() returns a new QString that removes entries by key.
+    pub fn remove(&self, key: &str) -> Self {
+        let mut pairs = self.clone().into_pairs();
+        pairs.retain(|p| {
+            p.0 != key
+        });
+        Self::new(pairs)
+    }
 }
 
 impl<'a> From<&'a str> for QString {
@@ -368,6 +377,16 @@ mod tests {
         assert_eq!(
             QString::from("&bar=baz&pooch&panda=bear").to_pairs(),
             vec![("bar", "baz"), ("pooch", ""), ("panda", "bear")]
+        );
+    }
+
+    #[test]
+    fn remove() {
+        let qs = QString::from("?foo=1&bar=2&foo=3&bar=4").remove("foo");
+
+        assert_eq!(
+            qs.to_pairs(),
+            vec![("bar", "2"), ("bar", "4")]
         );
     }
 
