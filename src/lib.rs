@@ -318,6 +318,8 @@ impl ::std::fmt::Display for QString {
 }
 
 fn decode(s: &str) -> String {
+    // application/x-www-form-urlencoded uses '+' for space (HTML forms).
+    let s = s.replace('+', " ");
     percent_decode(s.as_bytes())
         .decode_utf8()
         .map(|cow| cow.into_owned())
@@ -404,4 +406,11 @@ mod tests {
     test!(ac_is_5, "?a=b&c=", vec![("a", "b"), ("c", "")]);
     test!(ac_is_6, "?a=&c=d", vec![("a", ""), ("c", "d")]);
     test!(ac_is_7, "?a=b&c=d", vec![("a", "b"), ("c", "d")]);
+
+    test!(plus_is_space, "q=hello+world", vec![("q", "hello world")]);
+    test!(
+        plus_and_percent20,
+        "q=hello+world%21",
+        vec![("q", "hello world!")]
+    );
 }
